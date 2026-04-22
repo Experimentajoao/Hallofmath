@@ -138,8 +138,22 @@ function update(dt) {
     
     speedMult = 1 + (timeSurvived / 60) * 0.4; 
 
-    if (Math.random() < 0.01 * speedMult && entities.filter(e => e.type === 'gate').length === 0) spawnGate();
-    if (Math.random() < 0.005 * speedMult) spawnObstacle();
+        // --- LÓGICA DE SPAWN SEGURA ---
+    // Garante que haja um espaço de pelo menos 300 pixels entre qualquer obstáculo ou pergunta
+    let topIsClear = entities.every(e => e.y > 300);
+
+    if (topIsClear) {
+        let hasGate = entities.some(e => e.type === 'gate');
+        
+        // Prioriza criar uma pergunta se não houver nenhuma
+        if (!hasGate && Math.random() < 0.02 * speedMult) {
+            spawnGate();
+        } 
+        // Caso contrário, cria um obstáculo
+        else if (Math.random() < 0.01 * speedMult) {
+            spawnObstacle();
+        }
+    }
 
     stars.forEach(s => {
         s.y += (200 * dt * speedMult) / s.z;
