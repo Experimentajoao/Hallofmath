@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Runner: Sobrevivência Algébrica</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="game-wrapper">
+    <div class="ui-layer" id="game-ui" style="display: none;">
+        <div class="top-bar">
+            <div class="stat-box">
+                <div class="stat-label">Sobrevivência</div>
+                <div class="stat-value" id="timer">00:00</div>
+            </div>
+            <div id="combo-display">COMBO x2!</div>
+            <div class="stat-box">
+                <div class="stat-label">Energia</div>
+                <div class="health-bar" id="health">
+                    <div class="heart"></div><div class="heart"></div><div class="heart"></div>
+                </div>
+            </div>
+        </div>
+        <div id="question-panel">Carregando...</div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div class="overlay-screen" id="start-screen">
+        <h1>MATH SURVIVOR</h1>
+        <p class="subtitle">Desvie dos cristais vermelhos e passe pela resposta correta. Sobreviva o máximo que puder!</p>
+        <button id="btn-start">DECOLAR</button>
+        
+        <div class="leaderboard" id="start-leaderboard">
+            <h3>HALL DA FAMA (TOP 3)</h3>
+            <div id="lb-list-start"></div>
+        </div>
+    </div>
+
+    <div class="overlay-screen hidden" id="game-over-screen">
+        <h1 class="game-over-title">FIM DA LINHA</h1>
+        <p class="final-score">Tempo: <span id="final-time">00:00</span></p>
+        
+        <input type="text" id="player-name" placeholder="Seu nome ou @" value="@experimentajoao" maxlength="15">
+        <button id="btn-restart">SALVAR E JOGAR</button>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
