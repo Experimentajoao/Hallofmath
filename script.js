@@ -148,7 +148,7 @@ function update(dt) {
 
     for (let i = entities.length - 1; i >= 0; i--) {
         let e = entities[i];
-        e.y += 300 * dt * speedMult;
+        e.y += 150 * dt * speedMult;
 
         if (e.type === 'gate' && !e.passed && e.y + 60 > player.y) {
             e.passed = true;
