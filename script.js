@@ -114,7 +114,6 @@ function spawnGate() {
 }
 
 function spawnObstacle() {
-    function spawnObstacle() {
     // 1. Vasculha a tela e anota a faixa de todas as respostas certas ativas
     let faixasProibidas = [];
     entities.forEach(e => {
@@ -134,8 +133,6 @@ function spawnObstacle() {
 
     // 5. Cria o obstáculo na faixa segura
     entities.push({ type: 'obstacle', lane: faixaEscolhida, y: -40 });
-}
-
 }
 
 function spawnExplosion(x, y, color) {
@@ -159,7 +156,7 @@ function update(dt) {
     
     speedMult = 1 + (timeSurvived / 60) * 0.4; 
 
-        // --- LÓGICA DE SPAWN SEGURA ---
+    // --- LÓGICA DE SPAWN SEGURA ---
     // Garante que haja um espaço de pelo menos 300 pixels entre qualquer obstáculo ou pergunta
     let topIsClear = entities.every(e => e.y > 300);
 
@@ -183,7 +180,7 @@ function update(dt) {
 
     for (let i = entities.length - 1; i >= 0; i--) {
         let e = entities[i];
-        e.y += 150 * dt * speedMult;
+        e.y += 150 * dt * speedMult; // Velocidade reduzida para dar tempo de leitura
 
         if (e.type === 'gate' && !e.passed && e.y + 60 > player.y) {
             e.passed = true;
