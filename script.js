@@ -114,7 +114,28 @@ function spawnGate() {
 }
 
 function spawnObstacle() {
-    entities.push({ type: 'obstacle', lane: Math.floor(Math.random()*3), y: -40 });
+    function spawnObstacle() {
+    // 1. Vasculha a tela e anota a faixa de todas as respostas certas ativas
+    let faixasProibidas = [];
+    entities.forEach(e => {
+        if (e.type === 'gate') {
+            faixasProibidas.push(e.data.correctIdx);
+        }
+    });
+
+    // 2. Pega as faixas totais (0, 1 e 2) e filtra, tirando as proibidas
+    let faixasPermitidas = [0, 1, 2].filter(faixa => !faixasProibidas.includes(faixa));
+
+    // 3. Se por algum motivo todas as faixas estiverem proibidas, cancela o obstáculo
+    if (faixasPermitidas.length === 0) return;
+
+    // 4. Sorteia APENAS entre as faixas que sobraram e que são 100% seguras
+    let faixaEscolhida = faixasPermitidas[Math.floor(Math.random() * faixasPermitidas.length)];
+
+    // 5. Cria o obstáculo na faixa segura
+    entities.push({ type: 'obstacle', lane: faixaEscolhida, y: -40 });
+}
+
 }
 
 function spawnExplosion(x, y, color) {
