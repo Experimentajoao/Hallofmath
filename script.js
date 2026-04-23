@@ -30,13 +30,13 @@ function startMusic() {
     if (audioCtx.state === 'suspended') audioCtx.resume();
     musicInterval = setInterval(() => {
         if (!isPlaying) return;
-        playTone(melody[currentNote], 'square', 0.15, 0.04);
+        playTone(melody[currentNote], 'square', 0.15, 0.03);
         currentNote = (currentNote + 1) % melody.length;
         if (currentNote % 2 === 0) {
-            playTone(bassline[currentBass], 'sawtooth', 0.2, 0.06);
+            playTone(bassline[currentBass], 'sawtooth', 0.2, 0.05);
             currentBass = (currentBass + 1) % bassline.length;
         }
-    }, 200 / speedMult); // A música acelera com a velocidade do jogo
+    }, 200 / speedMult); 
 }
 
 function stopMusic() {
@@ -53,7 +53,16 @@ let cw, ch, laneW;
 let isPlaying = false, lastTime = 0, deltaTime = 0;
 let timeSurvived = 0, lives = 3, combo = 0, speedMult = 1;
 let entities = [], particles = [], stars = [];
-let player = { lane: 1, y: 0, color: '#00e5ff' };
+
+// REFINAMENTO VISUAL: Nave agora tem x suave, targetX e tilt (inclinação)
+let player = { 
+    lane: 1, 
+    x: 0, 
+    targetX: 0, // Onde a nave está indo
+    y: 0, 
+    tilt: 0, // Ângulo de inclinação atual
+    color: '#00e5ff' 
+};
 let visualFlash = { color: 'transparent', alpha: 0 };
 
 // Redimensionamento Dinâmico
@@ -62,6 +71,8 @@ function resize() {
     ch = canvas.height = canvas.parentElement.clientHeight;
     laneW = cw / 3;
     player.y = ch - 120;
+    // Sincroniza posição inicial
+    player.targetX = player.x = laneW * player.lane + laneW / 2;
 }
 window.addEventListener('resize', resize);
 resize();
@@ -114,7 +125,7 @@ function spawnGate() {
 }
 
 function spawnObstacle() {
-    // 1. Vasculha a tela e anota a faixa de todas as respostas certas ativas
+    // 1. Vasculha a tela e anota a faixa da resposta certa
     let faixasProibidas = [];
     entities.forEach(e => {
         if (e.type === 'gate') {
@@ -122,25 +133,28 @@ function spawnObstacle() {
         }
     });
 
-    // 2. Pega as faixas totais (0, 1 e 2) e filtra, tirando as proibidas
+    // 2. Filtra as faixas disponíveis (0, 1, 2) tirando a proibida
     let faixasPermitidas = [0, 1, 2].filter(faixa => !faixasProibidas.includes(faixa));
 
-    // 3. Se por algum motivo todas as faixas estiverem proibidas, cancela o obstáculo
+    // Segurança: se não sobrar faixa, cancela
     if (faixasPermitidas.length === 0) return;
 
-    // 4. Sorteia APENAS entre as faixas que sobraram e que são 100% seguras
+    // 3. Sorteia APENAS entre as faixas seguras
     let faixaEscolhida = faixasPermitidas[Math.floor(Math.random() * faixasPermitidas.length)];
 
-    // 5. Cria o obstáculo na faixa segura
     entities.push({ type: 'obstacle', lane: faixaEscolhida, y: -40 });
 }
 
-function spawnExplosion(x, y, color) {
-    for(let i=0; i<15; i++) {
+// REFINAMENTO VISUAL: Partículas têm velocidade dinâmica e duração variada
+function spawnExplosion(x, y, color, count = 15, speedRange = 15) {
+    for(let i=0; i<count; i++) {
         particles.push({
             x, y,
-            vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15,
-            life: 1, color
+            vx: (Math.random()-0.5) * speedRange, 
+            vy: (Math.random()-0.5) * speedRange,
+            life: Math.random() * 0.5 + 0.5, // Duração variada
+            color,
+            size: Math.random() * 3 + 2 // Tamanho variado
         });
     }
 }
@@ -156,18 +170,19 @@ function update(dt) {
     
     speedMult = 1 + (timeSurvived / 60) * 0.4; 
 
-    // --- LÓGICA DE SPAWN SEGURA ---
-    // Garante que haja um espaço de pelo menos 300 pixels entre qualquer obstáculo ou pergunta
-    let topIsClear = entities.every(e => e.y > 300);
+    // REFINAMENTO VISUAL: Nave move suavemente (interpolação) e inclina (tilt)
+    let moveVel = (player.targetX - player.x) * 0.15; // Velocidade lateral baseada na distância
+    player.x += moveVel;
+    player.tilt = moveVel * 0.04; // Ângulo de inclinação proporcional à velocidade lateral
 
-    if (topIsClear) {
-        let hasGate = entities.some(e => e.type === 'gate');
-        
-        // Prioriza criar uma pergunta se não houver nenhuma
-        if (!hasGate && Math.random() < 0.02 * speedMult) {
+    // --- LÓGICA DE SPAWN SEGURA ---
+    // Garante que haja um espaço livre no topo
+    let espacoLivre = entities.every(e => e.y > 200);
+
+    if (espacoLivre) {
+        if (entities.filter(e => e.type === 'gate').length === 0 && Math.random() < 0.02 * speedMult) {
             spawnGate();
         } 
-        // Caso contrário, cria um obstáculo
         else if (Math.random() < 0.01 * speedMult) {
             spawnObstacle();
         }
@@ -180,25 +195,30 @@ function update(dt) {
 
     for (let i = entities.length - 1; i >= 0; i--) {
         let e = entities[i];
-        e.y += 150 * dt * speedMult; // Velocidade reduzida para dar tempo de leitura
+        e.y += 150 * dt * speedMult; 
 
         if (e.type === 'gate' && !e.passed && e.y + 60 > player.y) {
             e.passed = true;
             if (player.lane === e.data.correctIdx) {
                 combo++;
                 playTone(800, 'sine', 0.1); playTone(1200, 'sine', 0.15);
-                spawnExplosion(player.lane * laneW + laneW/2, player.y, '#00ff00');
+                
+                // REFINAMENTO VISUAL: Explosão MASSIVA de partículas neon ao acertar
+                spawnExplosion(player.x, player.y, '#00ff00', 40, 25);
+                
                 triggerFlash('rgba(0, 255, 0, 0.2)');
                 if(combo > 2) document.getElementById('combo-display').style.opacity = 1;
             } else {
                 takeDamage();
-                spawnExplosion(player.lane * laneW + laneW/2, player.y, '#ff0000');
+                // Explosão menor e vermelha no erro
+                spawnExplosion(player.x, player.y, '#ff0000', 20, 15);
             }
         }
 
-        if (e.type === 'obstacle' && e.y + 40 > player.y && e.y < player.y + 40 && e.lane === player.lane) {
+        // Colisão com obstáculo
+        if (e.type === 'obstacle' && e.y + 40 > player.y && e.y < player.y + 40 && Math.abs(e.lane * laneW + laneW/2 - player.x) < 30) {
             takeDamage();
-            spawnExplosion(e.lane * laneW + laneW/2, e.y, '#ff0055');
+            spawnExplosion(e.lane * laneW + laneW/2, e.y, '#ff0055', 20, 15);
             entities.splice(i, 1);
             continue;
         }
@@ -219,10 +239,11 @@ function takeDamage() {
     combo = 0;
     document.getElementById('combo-display').style.opacity = 0;
     playTone(200, 'sawtooth', 0.4);
+    // Flash de dano na tela
     triggerFlash('rgba(255, 0, 85, 0.4)');
     
     let hearts = document.querySelectorAll('.heart');
-    if (lives >= 0 && lives < 3) hearts[lives].classList.add('lost');
+    if (hearts[lives]) hearts[lives].classList.add('lost');
     if (lives <= 0) gameOver();
 }
 
@@ -242,7 +263,9 @@ function draw() {
     });
     ctx.globalAlpha = 1;
 
-    ctx.strokeStyle = 'rgba(138, 43, 226, 0.3)';
+    // REFINAMENTO VISUAL: Faixas agora pulsam rítmico proporcional ao tempo de jogo
+    let pulseFactor = Math.sin(timeSurvived * 4) * 0.1 + 0.3;
+    ctx.strokeStyle = `rgba(138, 43, 226, ${pulseFactor})`;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(laneW, 0); ctx.lineTo(laneW, ch);
@@ -258,8 +281,12 @@ function draw() {
                 
                 ctx.fillStyle = 'rgba(20, 20, 40, 0.9)';
                 ctx.strokeStyle = e.passed ? (idx === e.data.correctIdx ? '#00ff00' : '#444') : '#8a2be2';
+                
+                // Brilho Neon suave nas respostas
+                ctx.shadowBlur = 10; ctx.shadowColor = ctx.strokeStyle;
                 ctx.lineWidth = 2;
                 ctx.beginPath(); ctx.roundRect(x, y, w, 60, 8); ctx.fill(); ctx.stroke();
+                ctx.shadowBlur = 0; // Reset brilho
                 
                 ctx.fillStyle = e.passed && idx !== e.data.correctIdx ? '#666' : '#fff';
                 ctx.font = 'bold 20px Poppins'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -268,34 +295,51 @@ function draw() {
         } else if (e.type === 'obstacle') {
             let cx = e.lane * laneW + laneW/2;
             ctx.fillStyle = '#ff0055';
-            ctx.shadowBlur = 15; ctx.shadowColor = '#ff0055';
+            // Brilho Neon forte nos obstáculos
+            ctx.shadowBlur = 20; ctx.shadowColor = '#ff0055';
             ctx.beginPath();
             ctx.moveTo(cx, e.y); ctx.lineTo(cx - 20, e.y + 40); ctx.lineTo(cx + 20, e.y + 40);
-            ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0;
+            ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; // Reset brilho
         }
     });
 
     particles.forEach(p => {
         ctx.globalAlpha = Math.max(0, p.life);
         ctx.fillStyle = p.color;
-        ctx.fillRect(p.x, p.y, 4, 4);
+        // Brilho Neon nas partículas
+        ctx.shadowBlur = 5; ctx.shadowColor = p.color;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+        ctx.shadowBlur = 0;
     });
     ctx.globalAlpha = 1;
 
-    let px = player.lane * laneW + laneW/2;
+    // REFINAMENTO VISUAL: Sistema de Inclinação da Nave (Tilt)
+    let px = player.x; // Posição suave calculada no Update
     let py = player.y;
     
+    ctx.save(); // Salva estado do canvas
+    ctx.translate(px, py); // Move o ponto de origem para o centro da nave
+    ctx.rotate(player.tilt); // Rotaciona o canvas baseado na inclinação
+
+    // Rastro do Motor (Brilho Turbo se Combo Alto)
     ctx.fillStyle = combo > 2 ? '#ffde00' : '#00e5ff';
-    ctx.beginPath(); ctx.moveTo(px-8, py+20); ctx.lineTo(px, py+40 + Math.random()*20); ctx.lineTo(px+8, py+20); ctx.fill();
+    ctx.shadowBlur = combo > 2 ? 20 : 10; ctx.shadowColor = ctx.fillStyle;
+    ctx.beginPath(); ctx.moveTo(-8, 20); ctx.lineTo(0, 40 + Math.random()*20); ctx.lineTo(8, 20); ctx.fill();
+    ctx.shadowBlur = 0;
 
+    // Corpo do Avião Geométrico
     ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#8a2be2'; ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(px, py - 25);
-    ctx.lineTo(px - 25, py + 20);
-    ctx.lineTo(px, py + 10);
-    ctx.lineTo(px + 25, py + 20);
-    ctx.closePath(); ctx.fill();
+    ctx.moveTo(0, -25); // Bico
+    ctx.lineTo(-25, 20); // Asa Esq
+    ctx.lineTo(0, 10); // Base
+    ctx.lineTo(25, 20); // Asa Dir
+    ctx.closePath(); ctx.fill(); ctx.stroke();
 
+    ctx.restore(); // Restaura estado do canvas (volta para origem normal)
+
+    // Overlay de Dano/Sucesso Visual
     if (visualFlash.alpha > 0) {
         ctx.fillStyle = visualFlash.color;
         ctx.globalAlpha = visualFlash.alpha;
@@ -317,24 +361,25 @@ function gameLoop(timestamp) {
 // ==========================================
 // 6. CONTROLES E EVENTOS DE TELA
 // ==========================================
-function movePlayer(direction) {
+function setPlayerLane(newLanes) {
     if (!isPlaying) return;
-    if (direction === 'left' && player.lane > 0) player.lane--;
-    if (direction === 'right' && player.lane < 2) player.lane++;
+    player.lane = newLanes;
+    // Define o X de destino para o movimento suave
+    player.targetX = laneW * player.lane + laneW / 2;
 }
 
 window.addEventListener('keydown', e => {
-    if (e.key === 'ArrowLeft') movePlayer('left');
-    if (e.key === 'ArrowRight') movePlayer('right');
+    if (e.key === 'ArrowLeft' && player.lane > 0) setPlayerLane(player.lane - 1);
+    if (e.key === 'ArrowRight' && player.lane < 2) setPlayerLane(player.lane + 1);
 });
 
 canvas.addEventListener('touchstart', e => {
     const touchX = e.touches[0].clientX;
     const canvasRect = canvas.getBoundingClientRect();
     const relX = touchX - canvasRect.left;
-    if (relX < cw/3) player.lane = 0;
-    else if (relX < (cw/3)*2) player.lane = 1;
-    else player.lane = 2;
+    if (relX < cw/3) setPlayerLane(0);
+    else if (relX < (cw/3)*2) setPlayerLane(1);
+    else setPlayerLane(2);
 });
 
 // ==========================================
@@ -354,6 +399,8 @@ function startGame() {
     document.getElementById('game-ui').style.display = 'flex';
     
     isPlaying = true; timeSurvived = 0; lives = 3; combo = 0; speedMult = 1; player.lane = 1;
+    // Zera posição suave
+    player.x = player.targetX = laneW * player.lane + laneW / 2;
     entities = []; particles = [];
     document.querySelectorAll('.heart').forEach(h => h.classList.remove('lost'));
     document.getElementById('combo-display').style.opacity = 0;
